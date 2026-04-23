@@ -1,0 +1,23 @@
+# Entorno virtual
+.venv/
+venv/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDE - PyCharm / JetBrains
+.idea/
+
+# Sistema operativo
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Radios (archivos MP3 pesados, no versionables)
+Radios/
