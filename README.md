@@ -71,3 +71,5 @@ pythonPYCHARM_PATH = r"C:\Program Files\JetBrains\PyCharm 2025.3.3\bin\pycharm64
 RUTA_BASE_PROYECTOS = r"D:\2026\PrograFinal\Proyecto final\..."
 Autores
 Proyecto desarrollado como trabajo final de Programación — 2026.
+
+PruebaVic
