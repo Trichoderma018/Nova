@@ -5,8 +5,6 @@ import pywhatkit #Libreria para busquedas en internet
 import webbrowser #Para interactuar con el navegador
 import datetime #Para datos de fecha y hora
 import wikipedia #Para interactuar con wikipedia
-import pyaudio #Para funciones de audio
-from wikipedia import languages #Para interactuar con lenguajes especificos de wikipedia
 import pyjokes #para chistes y bromas
 import subprocess #Para ejecutar procesos externos (PyCharm, Python, venv)
 import os #Para manejo de archivos y directorios
@@ -17,9 +15,9 @@ import sys #Para obtener el interprete de Python actual al lanzar el juego
 # Ruta del ejecutable de PyCharm (ajustar segun instalacion)
 PYCHARM_PATH = r"C:\Program Files\JetBrains\PyCharm 2025.3.3\bin\pycharm64.exe"
 # Ruta base por defecto para proyectos Python
-RUTA_BASE_PROYECTOS = r"D:\python"
+RUTA_BASE_PROYECTOS = r"D:\2026\PrograFinal\Proyecto final\Proyecto Radio y Borrachos\Proyecto"
 # Archivo del juego que el asistente puede ejecutar bajo demanda
-JUEGO_PY = "chepepresas_v5.py"
+JUEGO_PY = "Chepepresas.py"
 #endregion
 
 # Voz por defecto
@@ -114,7 +112,7 @@ def informar_dia():
 
     #Comunique el dia de la semana
     hablar(f'Hoy es {nombre_dia[num_dia]}')
-#Funcion para cominicar la hora actual
+#Funcion para comunicar la hora actual
 def informar_hora():
     #variable para los datos de la hora
     hora_actual = datetime.datetime.now()
@@ -137,6 +135,108 @@ def saludo(nombre):
 
     hablar(f'Hola {msj_saludo} {nombre}. Cómo te puedo ayudar hoy?')
 #endregion
+
+#region 5 FUNCIONES DE ASISTENCIA VIRTUAL
+def asistir_usuario():
+    hablar("Bienvenido")
+    hablar("Mi nombre es Nova, soy tu asistente virtual")
+    hablar("Por favor, dime tu nombre")
+    nombre_usuario = transformar_audio_en_texto().lower()
+    saludo(nombre_usuario)
+
+    # Variables de estado para manejo de proyectos y archivos
+    proyecto_actual = None  # Ruta del proyecto activo
+    archivo_actual = None   # Ruta del archivo en edicion
+    buffer_codigo = []      # Contenido del archivo en memoria
+
+    #variable para el control del bucle
+    iniciar = True
+
+    while iniciar:
+        #Activar el microfono para capturar la solicitud del usuario
+        solicitud = transformar_audio_en_texto().lower()
+
+        #Evaluamos la peticion del usuario para encontrar coincidencias de tipos de solicitud
+        if 'abrir youtube' in solicitud:
+            hablar(f"Con gusto {nombre_usuario}, aqui tienes Youtube")
+            webbrowser.open("https://www.youtube.com")
+            continue
+        elif 'abrir navegador' in solicitud:
+            hablar(f"Claro {nombre_usuario}, acabo de abrir el navegador, dime si necesitas algo más")
+            webbrowser.open("https://www.google.com")
+            continue
+        elif 'qué dia es hoy' in solicitud:
+            informar_dia()
+            continue
+        elif 'qué hora es' in solicitud:
+            informar_hora()
+            continue
+        elif 'busca en wikipedia' in solicitud:
+            hablar("Buscando en wikipedia, por favor espera")
+            solicitud = solicitud.replace("busca en wikipedia", "")
+            wikipedia.set_lang('es')
+            resultado = wikipedia.summary(solicitud, sentences=1)
+            hablar("Wikipedia contiene la siguiente información")
+            hablar(resultado)
+            continue
+        elif 'busca en internet' in solicitud:
+            hablar("Buscando en internet, por favor espera")
+            solicitud = solicitud.replace("busca en internet", "")
+            pywhatkit.search(solicitud)
+            hablar("Esto es lo que encontré")
+            continue
+        elif 'reproducir' in solicitud:
+            hablar("Buscando para reproducir")
+            solicitud = solicitud.replace("reproducir", "")
+            pywhatkit.playonyt(solicitud)
+            hablar(f"{nombre_usuario}, esto es lo que he encontrado, dime si requieres algo más.")
+            continue
+        elif 'chiste' in solicitud:
+            hablar(pyjokes.get_joke('es'))
+            continue
+        #region Nuevos comandos de PyCharm
+        elif 'qué puedes hacer' in solicitud:
+            listar_comandos()
+            continue
+        elif 'crear proyecto de python' in solicitud:
+            ruta = crear_proyecto_python()
+            if ruta:
+                proyecto_actual = ruta
+                archivo_actual = None
+                buffer_codigo = []
+            continue
+        elif 'abrir proyecto' in solicitud:
+            ruta = abrir_proyecto(nombre_usuario)
+            if ruta:
+                proyecto_actual = ruta
+                archivo_actual = None
+                buffer_codigo = []
+            continue
+        elif 'crear archivo' in solicitud:
+            ruta = crear_archivo(proyecto_actual)
+            if ruta:
+                archivo_actual = ruta
+                buffer_codigo = []
+            continue
+        elif 'dictar código' in solicitud or 'dictar codigo' in solicitud:
+            archivo_actual, buffer_codigo = dictar_codigo(proyecto_actual, archivo_actual, buffer_codigo)
+            continue
+        elif 'ejecutar programa' in solicitud:
+            ejecutar_programa(proyecto_actual, archivo_actual, nombre_usuario)
+            continue
+        elif 'guardar cambios' in solicitud:
+            guardar_cambios(archivo_actual, buffer_codigo)
+            continue
+        #endregion
+        # Comando para lanzar el juego Chepepresas.py
+        elif 'abrir juego' in solicitud or 'abre el juego' in solicitud or 'abrir el juego' in solicitud:
+            abrir_juego()
+            continue
+        elif 'adiós' in solicitud:
+            hablar(f"De acuerdo {nombre_usuario}. Me voy a descansar, cualquier cosa que necesites aqui estaré")
+            break
+#endregion
+
 
 #region 6 FUNCIONES DE PYCHARM - Interaccion con el IDE
 
@@ -496,106 +596,6 @@ def abrir_juego(juego_py=JUEGO_PY):
         hablar(f"Error al abrir el juego: {e}")
 #endregion
 
-#region 5 FUNCIONES DE ASISTENCIA VIRTUAL
-def asistir_usuario():
-    hablar("Bienvenido")
-    hablar("Mi nombre es Nova, soy tu asistente virtual")
-    hablar("Por favor, dime tu nombre")
-    nombre_usuario = transformar_audio_en_texto().lower()
-    saludo(nombre_usuario)
-
-    # Variables de estado para manejo de proyectos y archivos
-    proyecto_actual = None  # Ruta del proyecto activo
-    archivo_actual = None   # Ruta del archivo en edicion
-    buffer_codigo = []      # Contenido del archivo en memoria
-
-    #variable para el control del bucle
-    iniciar = True
-
-    while iniciar:
-        #Activar el microfono para capturar la solicitud del usuario
-        solicitud = transformar_audio_en_texto().lower()
-
-        #Evaluamos la peticion del usuario para encontrar coincidencias de tipos de solicitud
-        if 'abrir youtube' in solicitud:
-            hablar(f"Con gusto {nombre_usuario}, aqui tienes Youtube")
-            webbrowser.open("https://www.youtube.com")
-            continue
-        elif 'abrir navegador' in solicitud:
-            hablar(f"Claro {nombre_usuario}, acabo de abrir el navegador, dime si necesitas algo más")
-            webbrowser.open("https://www.google.com")
-            continue
-        elif 'qué dia es hoy' in solicitud:
-            informar_dia()
-            continue
-        elif 'qué hora es' in solicitud:
-            informar_hora()
-            continue
-        elif 'busca en wikipedia' in solicitud:
-            hablar("Buscando en wikipedia, por favor espera")
-            solicitud = solicitud.replace("busca en wikipedia", "")
-            wikipedia.set_lang('es')
-            resultado = wikipedia.summary(solicitud, sentences=1)
-            hablar("Wikipedia contiene la siguiente información")
-            hablar(resultado)
-            continue
-        elif 'busca en internet' in solicitud:
-            hablar("Buscando en internet, por favor espera")
-            solicitud = solicitud.replace("busca en internet", "")
-            pywhatkit.search(solicitud)
-            hablar("Esto es lo que encontré")
-            continue
-        elif 'reproducir' in solicitud:
-            hablar("Buscando para reproducir")
-            solicitud = solicitud.replace("reproducir", "")
-            pywhatkit.playonyt(solicitud)
-            hablar(f"{nombre_usuario}, esto es lo que he encontrado, dime si requieres algo más.")
-            continue
-        elif 'chiste' in solicitud:
-            hablar(pyjokes.get_joke('es'))
-            continue
-        #region Nuevos comandos de PyCharm
-        elif 'qué puedes hacer' in solicitud:
-            listar_comandos()
-            continue
-        elif 'crear proyecto de python' in solicitud:
-            ruta = crear_proyecto_python()
-            if ruta:
-                proyecto_actual = ruta
-                archivo_actual = None
-                buffer_codigo = []
-            continue
-        elif 'abrir proyecto' in solicitud:
-            ruta = abrir_proyecto(nombre_usuario)
-            if ruta:
-                proyecto_actual = ruta
-                archivo_actual = None
-                buffer_codigo = []
-            continue
-        elif 'crear archivo' in solicitud:
-            ruta = crear_archivo(proyecto_actual)
-            if ruta:
-                archivo_actual = ruta
-                buffer_codigo = []
-            continue
-        elif 'dictar código' in solicitud or 'dictar codigo' in solicitud:
-            archivo_actual, buffer_codigo = dictar_codigo(proyecto_actual, archivo_actual, buffer_codigo)
-            continue
-        elif 'ejecutar programa' in solicitud:
-            ejecutar_programa(proyecto_actual, archivo_actual, nombre_usuario)
-            continue
-        elif 'guardar cambios' in solicitud:
-            guardar_cambios(archivo_actual, buffer_codigo)
-            continue
-        #endregion
-        # Comando para lanzar el juego chepepresas_v5.py
-        elif 'abrir juego' in solicitud or 'abre el juego' in solicitud or 'abrir el juego' in solicitud:
-            abrir_juego()
-            continue
-        elif 'adiós' in solicitud:
-            hablar(f"De acuerdo {nombre_usuario}. Me voy a descansar, cualquier cosa que necesites aqui estaré")
-            break
-#endregion
 
 #region Programa Principal
 #verificar_microfono()
