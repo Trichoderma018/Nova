@@ -15,7 +15,7 @@ import sys #Para obtener el interprete de Python actual al lanzar el juego
 # Ruta del ejecutable de PyCharm (ajustar segun instalacion)
 RUTA_PYCHARM = r"C:\Program Files\JetBrains\PyCharm 2025.3.3\bin\pycharm64.exe"
 # Ruta base por defecto para proyectos Python
-RUTA_BASE_PROYECTOS = r"D:\2026\PrograFinal\Proyecto final\Proyecto Radio y Borrachos\Proyecto"
+RUTA_BASE_PROYECTOS = r"D:\python"
 # Archivo del juego que el asistente puede ejecutar bajo demanda
 JUEGO_PY = "chepepresas_v5.py"
 #endregion
