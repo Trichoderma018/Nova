@@ -17,7 +17,7 @@ RUTA_PYCHARM = r"C:\Program Files\JetBrains\PyCharm 2025.3.3\bin\pycharm64.exe"
 # Ruta base por defecto para proyectos Python
 RUTA_BASE_PROYECTOS = r"D:\2026\PrograFinal\Proyecto final\Proyecto Radio y Borrachos\Proyecto"
 # Archivo del juego que el asistente puede ejecutar bajo demanda
-JUEGO_PY = "Chepepresas.py"
+JUEGO_PY = "chepepresas_v5.py"
 #endregion
 
 # Voz por defecto del asistente (español Mexico - Sabina)
@@ -668,23 +668,21 @@ def guardar_cambios(archivo_actual, contenido_codigo):
         hablar(f"Error al guardar: {e}")
 
 def abrir_juego(juego_py=JUEGO_PY):
-    """Ejecuta el juego .py ubicado en la misma carpeta que este asistente
-    sin bloquear a Nova. Usa Popen para que el asistente siga escuchando
-    mientras el juego corre en un proceso separado."""
-    # Resolver ruta absoluta del juego junto al script del asistente
+    """Ejecuta el juego .py de forma bloqueante. Nova queda en pausa
+    hasta que el usuario cierre el juego, luego retoma el control
+    y da la bienvenida de vuelta."""
     directorio_base = os.path.dirname(os.path.abspath(__file__))
     ruta_juego = os.path.join(directorio_base, juego_py)
 
-    # Verificar que el archivo del juego existe
     if not os.path.isfile(ruta_juego):
         hablar(f"No encontré el juego {juego_py} en la carpeta del asistente")
         return
 
-    hablar("Abriendo el juego, disfrutalo")
+    hablar("Abriendo el juego, disfrutalo. Te espero cuando termines")
     try:
-        # Popen no bloquea: el asistente sigue escuchando mientras corre el juego
-        # sys.executable garantiza usar el mismo interprete (y venv) que ejecuta a Nova
-        subprocess.Popen([sys.executable, ruta_juego], cwd=directorio_base)
+        # run() bloquea hasta que el juego termine (ESC o cerrar ventana)
+        subprocess.run([sys.executable, ruta_juego], cwd=directorio_base)
+        hablar("Bienvenido de vuelta. ¿En qué te puedo ayudar?")
     except Exception as e:
         hablar(f"Error al abrir el juego: {e}")
 #endregion

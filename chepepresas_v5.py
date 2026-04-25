@@ -35,7 +35,11 @@ import random       # Generacion de numeros aleatorios (spawn, colores, zigzag)
 import sys          # Para cerrar el proceso del juego limpiamente
 import os           # Manejo de rutas de archivos e imagenes
 import math         # Funciones matematicas (seno para el zigzag)
+from moviepy import VideoFileClip
 #endregion
+
+clip = VideoFileClip("intro.mp4")
+clip.audio.write_audiofile("intro.mp3")
 
 #region Constantes de pantalla y juego
 ANCHO  = 480        # Ancho de la ventana del juego en pixeles
@@ -67,8 +71,8 @@ Y_FUERA     = 700    # Posicion Y donde un enemigo se considera fuera de pantall
 #endregion
 
 #region Limites verticales de movimiento del jugador
-LIMITE_SUP = 80      # Limite superior de movimiento del jugador
-LIMITE_INF = 690     # Limite inferior de movimiento del jugador
+LIMITE_SUP = 55      # Limite superior de movimiento del jugador
+LIMITE_INF = 745     # Limite inferior de movimiento del jugador
 #endregion
 
 #region Dimensiones y escala del carro
@@ -98,6 +102,41 @@ COLORES_ENEMIGO = [
 ]
 #endregion
 
+def reproducir_intro(pantalla):
+    import sys
+    ruta_video = os.path.join(os.path.dirname(os.path.abspath(__file__)), "intro.mp4")
+
+    if not os.path.exists(ruta_video):
+        print("No se encontró el video de intro")
+        return
+
+    clip = VideoFileClip(ruta_video)
+    clock = pygame.time.Clock()
+
+    # 🔊 INICIAR AUDIO
+    pygame.mixer.init()
+    pygame.mixer.music.load("intro.mp3")
+    pygame.mixer.music.play()
+
+    for frame in clip.iter_frames(fps=clip.fps, dtype="uint8"):
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if evento.type == pygame.KEYDOWN:
+                if evento.key in [pygame.K_ESCAPE, pygame.K_SPACE]:
+                    pygame.mixer.music.stop()
+                    return
+
+        frame = pygame.surfarray.make_surface(frame.swapaxes(0, 1))
+        frame = pygame.transform.scale(frame, (ANCHO, ALTO))
+
+        pantalla.blit(frame, (0, 0))
+        pygame.display.update()
+
+        clock.tick(clip.fps)
+
+    pygame.mixer.music.stop()
 
 #region Funcion de escala
 def obtener_escala(y):
@@ -146,14 +185,14 @@ class DesplazamientoFondo:
         self.actual = fondos[min(fondos.keys())]      # Fondo activo al inicio
         self.desplazamiento = 0.0                     # Offset vertical del scroll
 
-    def actualizar(self, vel, puntaje):
+    def actualizar(self, vel, tiempo_segundos):
         """Avanza el scroll y selecciona el fondo correspondiente al puntaje"""
         self.desplazamiento += vel
         if self.desplazamiento >= ALTO:
             self.desplazamiento -= ALTO
         # elegir fondo según puntaje
         for limite in sorted(self.fondos.keys()):
-            if puntaje >= limite:
+            if tiempo_segundos >= limite:
                 self.actual = self.fondos[limite]
 
     def dibujar(self, superficie):
@@ -574,51 +613,101 @@ class Particula:
 
 
 #region Funcion para dibujar el HUD (interfaz de usuario en pantalla)
-def dibujar_hud(superficie, fuente, puntaje, velocidad, vidas, radio):
-    """Dibuja la barra superior con puntaje, velocidad, vidas y el indicador de radio"""
-    # Barra semi-transparente en la parte superior
+def dibujar_hud(superficie, fuente, puntaje, velocidad, vidas, radio, estado, tiempo_segundos, no_eliminados):
+    """Dibuja la barra superior con puntaje, velocidad, vidas, radio y métricas extendidas"""
+
+    # ── BARRA SUPERIOR ──
     barra_hud = pygame.Surface((ANCHO, 50), pygame.SRCALPHA)
     barra_hud.fill((0, 0, 0, 160))
     superficie.blit(barra_hud, (0, 0))
 
-    # Puntaje a la izquierda
+    # Puntaje (izquierda)
     superficie.blit(fuente.render(f"PUNTAJE: {puntaje:05d}", True, AMARILLO), (10, 13))
 
-    # Velocimetro a la derecha (conversion ficticia a km/h)
+    # Velocidad (derecha)
     km  = int(80 + velocidad * 12)
     texto_vel = fuente.render(f"{km} km/h", True, BLANCO)
     superficie.blit(texto_vel, (ANCHO - texto_vel.get_width() - 10, 13))
 
-    # Vidas al centro
+    # Vidas (centro)
     texto_vidas = fuente.render(f"VIDAS: {vidas}", True, ROJO)
     superficie.blit(texto_vidas, (ANCHO//2 - texto_vidas.get_width()//2, 13))
 
-    # Indicador de radio encendida
+    # Radio (abajo izquierda)
     if radio.encendida and radio.nombre_estaciones:
         nombre = radio.nombre_estaciones[radio.indice_estacion_actual]
         texto_radio = fuente.render(f"📻 {nombre}", True, CELESTE)
         superficie.blit(texto_radio, (10, ALTO - 30))
+
+    # ── MÉTRICAS NUEVAS ──
+    y_base = 60
+
+    # Vidas perdidas
+    superficie.blit(
+        fuente.render(f"Vidas Perdidas: {estado['vidas_perdidas']}", True, ROJO),
+        (10, y_base)
+    )
+
+    # Enemigos eliminados (esquivados)
+    superficie.blit(
+        fuente.render(f"Eliminados: {estado['enemigos_eliminados']}", True, VERDE_CR),
+        (10, y_base + 25)
+    )
+
+    # Enemigos no eliminados
+    superficie.blit(
+        fuente.render(f"No eliminados: {no_eliminados}", True, AMARILLO),
+        (10, y_base + 50)
+    )
+
+    # Tiempo (formato MM:SS)
+    minutos = tiempo_segundos // 60
+    segundos = tiempo_segundos % 60
+    tiempo_str = f"{minutos:02d}:{segundos:02d}"
+
+    superficie.blit(
+        fuente.render(f"Tiempo: {tiempo_str}", True, BLANCO),
+        (10, y_base + 75)
+    )
 #endregion
 
 
 #region Pantalla de Game Over
-def dibujar_game_over(superficie, fuente_grande, fuente, puntaje):
-    """Dibuja la pantalla de fin de juego con puntaje y opciones"""
-    # Overlay oscuro semi-transparente
+
+def dibujar_game_over(superficie, fuente_grande, fuente, estado, tiempo_segundos, no_eliminados):
+    """Dibuja la pantalla de fin de juego con resumen completo"""
+
+    # Overlay oscuro
     overlay = pygame.Surface((ANCHO, ALTO), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 185))
     superficie.blit(overlay, (0, 0))
+
     cx = ANCHO // 2
-    # Textos centrados
+
+    # Formato de tiempo
+    minutos = tiempo_segundos // 60
+    segundos = tiempo_segundos % 60
+    tiempo_str = f"{minutos:02d}:{segundos:02d}"
+
+    # Textos
     for tipo_fuente, texto, color, y in [
-        (fuente_grande, "PRESA!",                    ROJO,          ALTO//2 - 90),
-        (fuente,        "Chocaste en el Coyol",      BLANCO,        ALTO//2 - 20),
-        (fuente,        f"Puntaje: {puntaje:05d}",   AMARILLO,      ALTO//2 + 25),
-        (fuente,        "[ R ] Reiniciar",           VERDE_CR,      ALTO//2 + 70),
-        (fuente,        "[ ESC ] Salir",             (160,160,160), ALTO//2 +105),
+        (fuente_grande, "PRESA!", ROJO, ALTO//2 - 140),
+        (fuente, "Chocaste en el Coyol", BLANCO, ALTO//2 - 100),
+
+        (fuente, f"Puntaje: {estado['puntaje']:05d}", AMARILLO, ALTO//2 - 60),
+
+        # RESUMEN
+        (fuente, f"Vidas perdidas: {estado['vidas_perdidas']}", ROJO, ALTO//2 - 20),
+        (fuente, f"Adversarios eliminados: {estado['enemigos_eliminados']}", VERDE_CR, ALTO//2 + 10),
+        (fuente, f"No eliminados: {no_eliminados}", AMARILLO, ALTO//2 + 40),
+        (fuente, f"Tiempo: {tiempo_str}", BLANCO, ALTO//2 + 70),
+
+        (fuente, "[ R ] Reiniciar", VERDE_CR, ALTO//2 + 120),
+        (fuente, "[ ESC ] Salir", (160,160,160), ALTO//2 + 150),
     ]:
         superficie_texto = tipo_fuente.render(texto, True, color)
         superficie.blit(superficie_texto, superficie_texto.get_rect(center=(cx, y)))
+
 #endregion
 
 
@@ -650,11 +739,12 @@ def dibujar_inicio(superficie, fuente_grande, fuente, fuente_chica):
 def cargar_fondos():
     """Carga las imagenes de fondo asociadas a rangos de puntaje"""
     archivos_imagenes = {
-        0:    "ImagenBase1.png",          # Fondo dia (puntaje 0+)
-        500:  "ImagenesBase5Tarde.png",   # Fondo tarde (puntaje 500+)
-        1000: "ImagenesBase3Noche.png",   # Fondo noche (puntaje 1000+)
-        1500: "ImagenesBase4Noche.png",   # Fondo noche 2 (puntaje 1500+)
-        2000: "ImagenesBase6Tarde.png"    # Fondo tarde 2 (puntaje 2000+)
+        0: "ImagenBase1Dia.png",
+        10: "ImagenBase2Dia.png",
+        15: "ImagenesBase5Tarde.png",
+        20: "ImagenesBase3Noche.png",
+        25: "ImagenesBase4Noche.png",
+        30: "ImagenesBase6Tarde.png",
     }
     fondos = {}
     for puntaje, nombre_archivo in archivos_imagenes.items():
@@ -674,6 +764,10 @@ def principal():
     pygame.init()
     pygame.display.set_caption(TITULO)
     pantalla = pygame.display.set_mode((ANCHO, ALTO))
+    pantalla = pygame.display.set_mode((ANCHO, ALTO))
+
+    # VIDEO DE INTRO
+    reproducir_intro(pantalla)
     reloj    = pygame.time.Clock()
 
     # Inicializar el mixer de audio (puede fallar si no hay dispositivo)
@@ -681,6 +775,13 @@ def principal():
         pygame.mixer.init()
     except Exception:
         pass
+
+    # sonido de Game Over
+    ruta_gameover = os.path.join(os.path.dirname(os.path.abspath(__file__)), "traficopitosGameOver.mp3")
+    sonido_gameover = None
+
+    if os.path.exists(ruta_gameover):
+        sonido_gameover = pygame.mixer.Sound(ruta_gameover)
 
     radio = SistemaRadio()
 
@@ -710,16 +811,21 @@ def principal():
     def reiniciar():
         """Retorna un diccionario con el estado inicial del juego"""
         return dict(
-            jugador          = Jugador(),
-            enemigos         = [],
-            particulas       = [],
-            puntaje          = 0,
-            velocidad        = float(VEL_BASE),
-            temporizador_aparicion = 0,
-            fin_del_juego    = False,
-            inicio           = True,
-            enemigos_creados = 0,
-            vidas            = 5,
+            jugador=Jugador(),
+            enemigos=[],
+            particulas=[],
+            puntaje=0,
+            velocidad=float(VEL_BASE),
+            temporizador_aparicion=0,
+            fin_del_juego=False,
+            inicio=True,
+            enemigos_creados=0,
+            vidas=5,
+            vidas_perdidas=0,
+            enemigos_eliminados=0,
+            tiempo_inicio=pygame.time.get_ticks(),
+            tiempo_final=None,
+            sonido_gameover_reproducido=False,
         )
 
     estado = reiniciar()
@@ -743,6 +849,9 @@ def principal():
                     estado = reiniciar()
                     estado["inicio"] = False
                     radio.apagar()
+                    # detener sonido de Game Over
+                    if sonido_gameover:
+                        sonido_gameover.stop()
                 # Salto durante el juego
                 if not estado["inicio"] and not estado["fin_del_juego"]:
                     if evento.key == pygame.K_SPACE:
@@ -763,7 +872,9 @@ def principal():
             estado["velocidad"] = min(VEL_BASE + estado["puntaje"] / 600, VEL_MAX)
             vel = estado["velocidad"]
 
-            desplazamiento.actualizar(vel * FONDO_FACTOR, estado["puntaje"])
+            tiempo_actual = pygame.time.get_ticks()
+            tiempo_segundos = (tiempo_actual - estado["tiempo_inicio"]) // 1000
+            desplazamiento.actualizar(vel * FONDO_FACTOR, tiempo_segundos)
 
             # Aparicion de enemigos
             estado["temporizador_aparicion"] += 1
@@ -779,6 +890,7 @@ def principal():
                     nuevo.carril = carril
                     nuevo.x      = float(CARRILES_X[carril])
                     estado["enemigos"].append(nuevo)
+                    estado["enemigos_creados"] += 1
 
             # Actualizar posicion de cada enemigo
             for e in estado["enemigos"]:
@@ -789,6 +901,7 @@ def principal():
             for e in estado["enemigos"]:
                 if e.fuera():
                     estado["puntaje"] += 10
+                    estado["enemigos_eliminados"] += 1
                 else:
                     vivos.append(e)
             estado["enemigos"] = vivos
@@ -802,6 +915,7 @@ def principal():
                         estado["jugador"].activar_confusion()
 
                     estado["vidas"] -= 1
+                    estado["vidas_perdidas"] += 1
 
                     # Generar particulas de explosion
                     for _ in range(80):
@@ -811,7 +925,12 @@ def principal():
 
                     if estado["vidas"] <= 0:
                         estado["fin_del_juego"] = True
+                        estado["tiempo_final"] = pygame.time.get_ticks()  # guardar tiempo final
                         radio.apagar()
+                        # reproducir sonido de Game Over
+                        if sonido_gameover and not estado["sonido_gameover_reproducido"]:
+                            sonido_gameover.play()
+                            estado["sonido_gameover_reproducido"] = True
                     else:
                         # Reposicionar al jugador en el centro
                         estado["jugador"].x       = float(CARRILES_X[1])
@@ -856,13 +975,41 @@ def principal():
             for p in estado["particulas"]:
                 p.dibujar(pantalla)
 
-            # Dibujar el HUD
-            dibujar_hud(pantalla, fuente, estado["puntaje"], estado["velocidad"],
-                        estado["vidas"], radio)
+            #tiempo_actual = pygame.time.get_ticks()
+            #tiempo_segundos = (tiempo_actual - estado["tiempo_inicio"]) // 1000
+
+            #Cambio para detener el tiempo al perder:
+            if estado["fin_del_juego"]:
+                tiempo_segundos = (estado["tiempo_final"] - estado["tiempo_inicio"]) // 1000
+            else:
+                tiempo_actual = pygame.time.get_ticks()
+                tiempo_segundos = (tiempo_actual - estado["tiempo_inicio"]) // 1000
+
+            no_eliminados = estado["enemigos_creados"] - estado["enemigos_eliminados"]
+
+            dibujar_hud(
+                pantalla,
+                fuente,
+                estado["puntaje"],
+                estado["velocidad"],
+                estado["vidas"],
+                radio,
+                estado,
+                tiempo_segundos,
+                no_eliminados
+            )
 
             # Si es game over, dibujar la pantalla de fin
             if estado["fin_del_juego"]:
-                dibujar_game_over(pantalla, fuente_grande, fuente, estado["puntaje"])
+                #dibujar_game_over(pantalla, fuente_grande, fuente, estado["puntaje"])
+                dibujar_game_over(
+                    pantalla,
+                    fuente_grande,
+                    fuente,
+                    estado,
+                    tiempo_segundos,
+                    no_eliminados
+                )
 
         pygame.display.flip()
 #endregion
